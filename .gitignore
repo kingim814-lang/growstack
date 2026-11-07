@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+dist/
+build/
+
+# Prisma generated files (only if generated locally)
+# Uncomment only if your generated Prisma client is inside a custom output folder.
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# OS files
+.DS_Store

@@ -12,6 +12,7 @@ import {
   MessageSquare,
   ChevronRight,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import Image from "next/image";
 import { getConversations, deleteConversation } from "@/lib/api";
@@ -226,8 +227,9 @@ export default function Sidebar() {
             href="/chat"
             onClick={handleNewChat}
             title="New chat"
-            className="text-xl font-semibold tracking-tight"
+            className="text-xl font-semibold tracking-tight flex gap-2 items-center"
           >
+            <Sparkles className="h-5 w-5 dark:text-white" />
             Growstack
           </Link>
         )}

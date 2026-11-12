@@ -12,7 +12,7 @@ export default function LogoutButton() {
   async function handleLogout() {
     try {
       setLoading(true);
-      await signOut({ redirectUrl: "/sign-in" });
+      await signOut({ redirectUrl: "/" });
     } catch (error) {
       console.error("Logout failed:", error);
       setLoading(false);

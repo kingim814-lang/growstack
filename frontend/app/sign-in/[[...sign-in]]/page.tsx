@@ -20,7 +20,7 @@ export default function SignInPage() {
             path="/sign-in"
             routing="path"
             signUpUrl="/sign-up"
-            fallbackRedirectUrl="/dashboard"
+            fallbackRedirectUrl="/chat"
             appearance={{
               elements: {
                 card: "bg-slate-900 border border-slate-800 shadow-xl rounded-2xl",

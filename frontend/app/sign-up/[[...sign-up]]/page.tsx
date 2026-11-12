@@ -19,7 +19,7 @@ export default function SignUpPage() {
           <SignUp
             path="/sign-up"
             routing="path"
-            signInUrl="/sign-in"
+            signInUrl="/chat"
             fallbackRedirectUrl="/dashboard"
             appearance={{
               elements: {

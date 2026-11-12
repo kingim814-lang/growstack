@@ -24,6 +24,12 @@ export type SendMessageResponse = {
   assistantMessage: Message;
 };
 
+export type EditMessageResponse = {
+  message: string;
+  userMessage: Message;
+  assistantMessage: Message;
+};
+
 type ConversationsResponse = {
   conversations: Conversation[];
 };
@@ -42,7 +48,6 @@ type GetConversationResponse = {
 // ==============================
 // Common API Request
 // ==============================
-
 async function apiRequest<T>(
   endpoint: string,
   token: string,
@@ -126,21 +131,68 @@ export async function getConversation(
 // ==============================
 // Send Message
 // ==============================
-
-export function sendMessage(
+export async function sendMessage(
   token: string,
   conversationId: string,
-  content: string
-) {
-  return apiRequest<SendMessageResponse>(
-    `/api/conversations/${conversationId}/messages`,
-    token,
+  content: string,
+  signal?: AbortSignal
+): Promise<Message> {
+  if (!API_URL) {
+    throw new Error("API URL is missing");
+  }
+
+  if (!token) {
+    throw new Error("Authentication token is missing");
+  }
+
+  const response = await fetch(
+    `${API_URL}/api/conversations/${conversationId}/messages`,
     {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ content }),
+      ...(signal ? { signal } : {}),
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || "Failed to send message");
+  }
+
+  const data: {
+    userMessage: Message;
+    assistantMessage: Message;
+  } = await response.json();
+
+  return data.assistantMessage;
+}
+
+// ==============================
+// Edit Message
+// ==============================
+
+export async function editMessage(
+  token: string,
+  conversationId: string,
+  messageId: string,
+  content: string,
+  signal?: AbortSignal
+): Promise<EditMessageResponse> {
+  return apiRequest<EditMessageResponse>(
+    `/api/conversations/${conversationId}/messages/${messageId}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+      ...(signal ? { signal } : {}),
     }
   );
 }
+
 
 // ==============================
 // Delete Conversation

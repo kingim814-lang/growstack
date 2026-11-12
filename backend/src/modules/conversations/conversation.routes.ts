@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { clerkMiddleware } from "@clerk/express";
 
 import {
   createConversation,
@@ -7,16 +6,16 @@ import {
   getConversation,
   sendMessage,
   deleteConversation,
+  editMessage,
 } from "./conversation.controller.js";
 
 const router = Router();
-
-router.use(clerkMiddleware());
 
 router.post("/", createConversation);
 router.get("/", getConversations);
 router.get("/:id", getConversation);
 router.post("/:id/messages", sendMessage);
 router.delete("/:id", deleteConversation);
+router.patch("/:id/messages/:messageId", editMessage);
 
 export default router;

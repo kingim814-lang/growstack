@@ -1,10 +1,10 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
-
 import {
   Plus,
   PanelLeftClose,
@@ -19,24 +19,30 @@ import { getConversations, deleteConversation } from "@/lib/api";
 type Conversation = {
   id: string;
   title: string;
+  createdAt: string;
 };
 
-// Temporary empty list.
-// Later, we'll load conversations from the database.
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, isLoaded } = useUser();
-  const { getToken } = useAuth();
   const router = useRouter();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
 
+  const [collapsed, setCollapsed] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const hasLoadedConversations = useRef(false);
+
+  // Navigate to a fresh chat and notify ChatPage to reset.
+  function handleNewChat() {
+    window.dispatchEvent(new Event("growstack:new-chat"));
+  }
+
+  // Fetch conversations from the backend.
   useEffect(() => {
     if (!isLoaded || !user) return;
 
@@ -44,7 +50,10 @@ export default function Sidebar() {
 
     async function loadConversations() {
       try {
-        setLoading(true);
+        if (!hasLoadedConversations.current) {
+          setLoading(true);
+        }
+
         setError(null);
 
         const token = await getToken();
@@ -56,7 +65,26 @@ export default function Sidebar() {
         const data = await getConversations(token);
 
         if (!cancelled) {
-          setConversations(data);
+          setConversations((previous) => {
+            const merged = [...data, ...previous];
+
+            const unique = new Map(
+              merged.map((conversation) => [
+                conversation.id,
+                conversation,
+              ])
+            );
+
+            return Array.from(unique.values())
+              .filter((conversation) => conversation.title !== "New Chat")
+              .sort(
+                (a, b) =>
+                  new Date(b.createdAt).getTime() -
+                  new Date(a.createdAt).getTime()
+              );
+          });
+
+          hasLoadedConversations.current = true;
         }
       } catch (err) {
         console.error("Failed to fetch conversations:", err);
@@ -76,10 +104,64 @@ export default function Sidebar() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, user, getToken, pathname]);
+  }, [isLoaded, user, getToken]);
+
+  // Listen for newly created or updated conversations.
+  useEffect(() => {
+    function handleConversationUpdated(event: Event) {
+      const customEvent = event as CustomEvent<Partial<Conversation>>;
+      const updatedConversation = customEvent.detail;
+
+      if (!updatedConversation?.id) return;
+
+      setConversations((previous) => {
+        const existing = previous.find(
+          (conversation) =>
+            conversation.id === updatedConversation.id
+        );
+
+        const conversation: Conversation = {
+          id: updatedConversation.id || "",
+          title:
+            updatedConversation.title ||
+            existing?.title ||
+            "New Chat",
+          createdAt:
+            updatedConversation.createdAt ||
+            existing?.createdAt ||
+            new Date().toISOString(),
+        };
+
+        const filtered = previous.filter(
+          (item) => item.id !== conversation.id
+        );
+
+        return [conversation, ...filtered]
+          .filter((item) => item.title !== "New Chat")
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() -
+              new Date(a.createdAt).getTime()
+          );
+      });
+    }
+
+    window.addEventListener(
+      "growstack:conversation-updated",
+      handleConversationUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        "growstack:conversation-updated",
+        handleConversationUpdated
+      );
+    };
+  }, []);
 
   const isActive = (id: string) => pathname === `/chat/${id}`;
 
+  // Delete a conversation.
   async function handleDeleteConversation(id: string) {
     const confirmed = window.confirm(
       "Are you sure you want to delete this conversation?"
@@ -105,43 +187,59 @@ export default function Sidebar() {
       if (pathname === `/chat/${id}`) {
         router.push("/chat");
       }
-    } catch (error) {
-      console.error("Failed to delete conversation:", error);
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
       alert("Unable to delete conversation. Please try again.");
     } finally {
       setDeletingId(null);
     }
   }
 
+  // Clerk loading state.
   if (!isLoaded) {
     return (
-      <aside className="w-64 h-screen border-r bg-[#f9f9f9]" />
+      <aside
+        className="
+          h-screen w-65 shrink-0 border-r
+          border-[#e5e5e5] bg-[#f9f9f9]
+          dark:border-[#303030] dark:bg-[#171717]
+        "
+      />
     );
   }
 
   return (
     <aside
       className={`
-            flex h-screen flex-col border-r
-            border-[#e5e5e5] dark:border-[#303030]
-            bg-[#f9f9f9] text-[#171717]
-            dark:bg-[#171717] dark:text-[#ececec]
-            transition-all duration-200
-            ${collapsed ? "w-17" : "w-65"}
-        `}
+        flex h-screen flex-col border-r
+        border-[#e5e5e5] dark:border-[#303030]
+        bg-[#f9f9f9] text-[#171717]
+        dark:bg-[#171717] dark:text-[#ececec]
+        transition-all duration-200
+        ${collapsed ? "w-17" : "w-65"}
+      `}
     >
       {/* HEADER */}
       <div className="flex h-16 items-center justify-between px-3">
         {!collapsed && (
-          <Link href="/chat" className="text-xl font-semibold tracking-tight">
+          <Link
+            href="/chat"
+            onClick={handleNewChat}
+            title="New chat"
+            className="text-xl font-semibold tracking-tight"
+          >
             Growstack
           </Link>
         )}
 
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          type="button"
+          onClick={() => setCollapsed((previous) => !previous)}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="rounded-lg p-2 text-[#666] hover:bg-[#ececec] dark:hover:bg-[#303030]"
+          className="
+            rounded-lg p-2 text-[#666]
+            hover:bg-[#ececec] dark:hover:bg-[#303030]
+          "
         >
           {collapsed ? (
             <PanelLeftOpen size={20} />
@@ -155,6 +253,7 @@ export default function Sidebar() {
       <div className="space-y-1 px-2">
         <Link
           href="/chat"
+          onClick={handleNewChat}
           title="New chat"
           className={`
             flex items-center gap-3 rounded-lg px-3 py-2.5
@@ -166,8 +265,7 @@ export default function Sidebar() {
           {!collapsed && <span>New chat</span>}
         </Link>
       </div>
-      
-      
+
       {/* RECENT CONVERSATIONS */}
       <div className="mt-7 flex-1 overflow-y-auto px-2">
         {!collapsed && (
@@ -180,6 +278,10 @@ export default function Sidebar() {
           <div className="flex justify-center py-3 text-[#999]">
             <MessageSquare size={19} />
           </div>
+        ) : !user ? (
+          <p className="px-3 py-3 text-xs text-[#999]">
+            Sign in to see your conversations.
+          </p>
         ) : loading ? (
           <p className="px-3 py-3 text-xs text-[#999]">
             Loading conversations...
@@ -204,7 +306,10 @@ export default function Sidebar() {
               >
                 <Link
                   href={`/chat/${conversation.id}`}
-                  className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-sm"
+                  className="
+                    flex min-w-0 flex-1 items-center
+                    gap-2 px-3 py-2 text-sm
+                  "
                 >
                   <MessageSquare
                     size={16}
@@ -220,7 +325,9 @@ export default function Sidebar() {
                   type="button"
                   title="Delete conversation"
                   disabled={deletingId === conversation.id}
-                  onClick={() => handleDeleteConversation(conversation.id)}
+                  onClick={() =>
+                    handleDeleteConversation(conversation.id)
+                  }
                   className="
                     mr-1 rounded-md p-1.5
                     text-[#888] opacity-0
@@ -248,14 +355,15 @@ export default function Sidebar() {
       </div>
 
       {/* USER PROFILE */}
-      <div className="border-t border-[#e5e5e5] p-2">
+      <div className="border-t border-[#e5e5e5] p-2 dark:border-[#303030]">
         {user && (
           <Link
             href="/dashboard"
             title="Open profile"
             className={`
               flex items-center gap-3 rounded-lg p-2
-              hover:bg-[#ececec] dark:hover:bg-[#303030] transition-colors
+              hover:bg-[#ececec] dark:hover:bg-[#303030]
+              transition-colors
               ${collapsed ? "justify-center" : ""}
             `}
           >

@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+.venv/
 
 # Next.js
 .next/
@@ -26,3 +27,5 @@ coverage/
 
 # OS files
 .DS_Store
+
+/python-backend
